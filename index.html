@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Investigation Log: Cracking the Hash</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,500;0,600;0,700;1,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EDE9DE;
+    --paper-2:#E3DDCC;
+    --ink:#1F2320;
+    --ink-soft:#4B4F49;
+    --rule:#C9C2AC;
+    --steel:#33544F;
+    --steel-2:#264542;
+    --amber:#B4712B;
+    --amber-2:#8f5820;
+    --console-bg:#14201D;
+    --console-ink:#DCEfE6;
+    --console-accent:#6FBFA0;
+    --danger:#8C3A2E;
+    --ok:#3E6B4A;
+    --radius: 3px;
+  }
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --paper:#1B1E1B;
+      --paper-2:#232722;
+      --ink:#E9E6DC;
+      --ink-soft:#B7B6AC;
+      --rule:#3B3F38;
+      --steel:#7FBFB6;
+      --steel-2:#9FD3CA;
+      --amber:#D89550;
+      --amber-2:#E8AC6C;
+      --console-bg:#0D1512;
+      --console-ink:#CDEFE0;
+      --console-accent:#8FD9BB;
+      --danger:#D98A7B;
+      --ok:#8FCB9E;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#1B1E1B;
+    --paper-2:#232722;
+    --ink:#E9E6DC;
+    --ink-soft:#B7B6AC;
+    --rule:#3B3F38;
+    --steel:#7FBFB6;
+    --steel-2:#9FD3CA;
+    --amber:#D89550;
+    --amber-2:#E8AC6C;
+    --console-bg:#0D1512;
+    --console-ink:#CDEFE0;
+    --console-accent:#8FD9BB;
+    --danger:#D98A7B;
+    --ok:#8FCB9E;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-padding-top: env(safe-area-inset-top, 0px);}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', system-ui, sans-serif;
+    line-height:1.55;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+    -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:760px;margin:0 auto;padding:28px 20px 80px;}
+  header.hero{
+    border-bottom:2px solid var(--ink);
+    padding-bottom:22px;
+    margin-bottom:28px;
+  }
+  .kicker{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    letter-spacing:.02em;
+    color:var(--steel);
+    margin:0 0 10px;
+  }
+  h1{
+    font-family:'Newsreader', serif;
+    font-weight:700;
+    font-style:italic;
+    font-size:clamp(28px,5vw,40px);
+    line-height:1.08;
+    margin:0 0 10px;
+    color:var(--ink);
+  }
+  .dek{
+    font-size:16px;
+    color:var(--ink-soft);
+    max-width:56ch;
+    margin:0 0 18px;
+  }
+  .idfields{
+    display:flex;
+    gap:14px;
+    flex-wrap:wrap;
+    margin-top:16px;
+  }
+  .idfields label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px;
+    color:var(--ink-soft);
+    display:block;
+    margin-bottom:4px;
+  }
+  .idfields input{
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:14px;
+    padding:7px 9px;
+    border:1px solid var(--rule);
+    border-radius:var(--radius);
+    background:var(--paper-2);
+    color:var(--ink);
+    width:200px;
+  }
+  .idfields input:focus{outline:2px solid var(--steel); outline-offset:1px;}
+
+  .brief{
+    background:var(--paper-2);
+    border:1px solid var(--rule);
+    border-radius:var(--radius);
+    padding:18px 20px;
+    margin-bottom:30px;
+  }
+  .brief h2{
+    font-family:'Newsreader', serif;
+    font-size:19px;
+    margin:0 0 8px;
+  }
+  .brief p{margin:0 0 10px; font-size:15px;}
+  .brief p:last-child{margin-bottom:0;}
+  .hook{
+    font-family:'Newsreader', serif;
+    font-style:italic;
+    font-size:18px;
+    color:var(--steel-2);
+    border-left:3px solid var(--steel);
+    padding-left:14px;
+    margin:14px 0;
+  }
+
+  .howto{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:8px;
+    font-size:14px;
+    margin-top:6px;
+  }
+  .howto div{
+    display:flex;
+    gap:10px;
+    align-items:baseline;
+  }
+  .howto span.n{
+    font-family:'IBM Plex Mono', monospace;
+    color:var(--steel);
+    font-size:12.5px;
+    flex-shrink:0;
+    width:16px;
+  }
+  a.cc-link{
+    color:var(--steel-2);
+    font-weight:600;
+    text-decoration-thickness:1.5px;
+  }
+
+  .progress-rail{
+    display:flex;
+    gap:6px;
+    margin:8px 0 34px;
+  }
+  .progress-rail .seg{
+    height:5px;
+    flex:1;
+    background:var(--rule);
+    border-radius:3px;
+    transition:background .25s ease;
+  }
+  .progress-rail .seg.done{background:var(--steel);}
+
+  .station{
+    margin-bottom:34px;
+    padding-bottom:30px;
+    border-bottom:1px solid var(--rule);
+  }
+  .station:last-of-type{border-bottom:none;}
+  .station-head{
+    display:flex;
+    align-items:baseline;
+    gap:12px;
+    margin-bottom:6px;
+  }
+  .station-num{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    color:var(--amber);
+    border:1px solid var(--amber);
+    border-radius:2px;
+    padding:1px 7px;
+    flex-shrink:0;
+  }
+  .station h2{
+    font-family:'Newsreader', serif;
+    font-weight:600;
+    font-size:22px;
+    margin:0;
+  }
+  .station .goal{
+    color:var(--ink-soft);
+    font-size:14.5px;
+    margin:6px 0 16px;
+  }
+  .steps{
+    background:var(--paper-2);
+    border:1px solid var(--rule);
+    border-radius:var(--radius);
+    padding:14px 18px;
+    margin-bottom:16px;
+  }
+  .steps ol{margin:0; padding-left:20px;}
+  .steps li{margin-bottom:6px; font-size:14.5px;}
+  .steps li:last-child{margin-bottom:0;}
+  code.field{
+    font-family:'IBM Plex Mono', monospace;
+    background:var(--console-bg);
+    color:var(--console-accent);
+    padding:1px 6px;
+    border-radius:2px;
+    font-size:13px;
+  }
+
+  .console{
+    background:var(--console-bg);
+    color:var(--console-ink);
+    border-radius:var(--radius);
+    padding:14px 16px;
+    margin-bottom:14px;
+  }
+  .console label{
+    display:block;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px;
+    color:var(--console-accent);
+    margin-bottom:6px;
+  }
+  .console input, .console textarea{
+    width:100%;
+    background:#0000;
+    border:1px solid #ffffff33;
+    border-radius:2px;
+    color:var(--console-ink);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    padding:8px 10px;
+    resize:vertical;
+  }
+  .console input:focus, .console textarea:focus{outline:1.5px solid var(--console-accent);}
+  .console + .console{margin-top:-4px;}
+
+  .qbox{margin-bottom:14px;}
+  .qbox p.q{font-size:15px; margin:0 0 6px; font-weight:500;}
+  .qbox textarea{
+    width:100%;
+    min-height:56px;
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:14px;
+    padding:9px 11px;
+    border:1px solid var(--rule);
+    border-radius:var(--radius);
+    background:var(--paper-2);
+    color:var(--ink);
+  }
+  .qbox textarea:focus{outline:2px solid var(--steel); outline-offset:1px;}
+
+  table.datatab{
+    width:100%;
+    border-collapse:collapse;
+    font-size:13.5px;
+    margin-bottom:14px;
+  }
+  table.datatab th, table.datatab td{
+    border:1px solid var(--rule);
+    padding:7px 8px;
+    text-align:left;
+    vertical-align:top;
+  }
+  table.datatab th{
+    background:var(--paper-2);
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:600;
+    font-size:12px;
+  }
+  table.datatab td input{
+    width:100%;
+    border:none;
+    background:transparent;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    color:var(--ink);
+    padding:2px;
+  }
+  table.datatab td input:focus{outline:1.5px solid var(--steel);}
+  .overflow-x{overflow-x:auto;}
+
+  .callout{
+    background:transparent;
+    border-left:3px solid var(--amber);
+    padding:8px 14px;
+    font-size:14px;
+    color:var(--ink-soft);
+    margin-bottom:14px;
+  }
+  .callout.danger{border-left-color:var(--danger);}
+
+  details.key{
+    margin-top:38px;
+    border:1px dashed var(--rule);
+    border-radius:var(--radius);
+    padding:12px 16px;
+  }
+  details.key summary{
+    cursor:pointer;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    color:var(--ink-soft);
+  }
+  details.key .keybody{margin-top:14px; font-size:13.5px;}
+  details.key h3{font-family:'Newsreader', serif; font-size:16px; margin:16px 0 6px;}
+  details.key table.datatab td, details.key table.datatab th{font-size:11.5px;}
+
+  footer.foot{
+    margin-top:40px;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .savepill{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px;
+    color:var(--ok);
+  }
+
+  @media (max-width:520px){
+    .idfields input{width:100%;}
+    .idfields label{width:100%;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <p class="kicker">CYBERSECURITY &mdash; LAB INVESTIGATION</p>
+    <h1>Cracking the Hash</h1>
+    <p class="dek">A CyberChef field investigation into how — and why — your passwords never get stored as plain text.</p>
+    <div class="idfields">
+      <div><label for="fname">Investigator name</label><input id="fname" type="text" placeholder="Your name"></div>
+      <div><label for="fperiod">Period / class</label><input id="fperiod" type="text" placeholder="e.g. Period 4"></div>
+    </div>
+  </header>
+
+  <section class="brief">
+    <h2>Case briefing</h2>
+    <p>When you type a password into a real login form, the site is not supposed to keep a copy of what you typed. Instead, it runs your password through a one-way math function called a <strong>hash</strong>, and stores only the scrambled result. Every time you log in again, the site re-hashes what you type and checks whether the two scrambled results match.</p>
+    <p class="hook">If hashing is one-way, how does anyone ever verify a password &mdash; and what happens when the hash itself gets stolen?</p>
+    <p>You'll answer that using <strong>CyberChef</strong>, a browser tool that lets you build a "recipe" of operations and watch data transform step by step. No installs, no accounts. Keep this page open in one tab and CyberChef in another.</p>
+    <div class="howto">
+      <div><span class="n">01</span><span>Open <a class="cc-link" href="https://gchq.github.io/CyberChef/" target="_blank" rel="noopener">gchq.github.io/CyberChef</a> in a new tab.</span></div>
+      <div><span class="n">02</span><span>Type your text into the <code class="field">Input</code> box on the right.</span></div>
+      <div><span class="n">03</span><span>Search the <code class="field">Operations</code> list (top left) for the operation named in each station below, then drag it into the empty <code class="field">Recipe</code> column in the middle.</span></div>
+      <div><span class="n">04</span><span>Read the scrambled result in the <code class="field">Output</code> box at the bottom right.</span></div>
+      <div><span class="n">05</span><span>Record what you find in the consoles on this page — your answers stay saved on this device as you go.</span></div>
+    </div>
+  </section>
+
+  <div class="progress-rail" id="rail"></div>
+
+  <!-- STATION 1 -->
+  <section class="station" data-station="1">
+    <div class="station-head"><span class="station-num">01</span><h2>Your first hash</h2></div>
+    <p class="goal">Goal: produce a hash and see whether it can be reversed.</p>
+    <div class="steps">
+      <ol>
+        <li>In CyberChef, set Input to exactly: <code class="field">password123</code></li>
+        <li>Search Operations for <code class="field">MD5</code> and drag it into the Recipe.</li>
+        <li>Copy the string that appears in Output.</li>
+      </ol>
+    </div>
+    <div class="console">
+      <label>Output &mdash; MD5 hash of "password123"</label>
+      <input type="text" data-save="s1_hash" placeholder="paste the 32-character result here">
+    </div>
+    <div class="qbox">
+      <p class="q">Q1. Count the characters in your result. Is there any part of "password123" you can still visually recognize in it?</p>
+      <textarea data-save="s1_q1"></textarea>
+    </div>
+    <div class="qbox">
+      <p class="q">Q2. If a hacker stole this hash from a database, could they type it back into a "reverse MD5" tool and get "password123" back out? Why is hashing described as one-way?</p>
+      <textarea data-save="s1_q2"></textarea>
+    </div>
+  </section>
+
+  <!-- STATION 2 -->
+  <section class="station" data-station="2">
+    <div class="station-head"><span class="station-num">02</span><h2>The avalanche effect</h2></div>
+    <p class="goal">Goal: test how much output changes when input changes just slightly.</p>
+    <div class="steps">
+      <ol>
+        <li>Keep the MD5 recipe. Change Input to: <code class="field">Password123</code> (capital P only — everything else identical).</li>
+        <li>Copy the new Output.</li>
+      </ol>
+    </div>
+    <div class="console">
+      <label>Output &mdash; MD5 hash of "Password123"</label>
+      <input type="text" data-save="s2_hash" placeholder="paste the result here">
+    </div>
+    <div class="qbox">
+      <p class="q">Q3. Compare this hash to your Station 1 hash character by character. Roughly what fraction of it looks the same?</p>
+      <textarea data-save="s2_q1"></textarea>
+    </div>
+    <div class="qbox">
+      <p class="q">Q4. This "one tiny change, wildly different output" property is called the <em>avalanche effect</em>. Why is that a useful security property for a password hash to have?</p>
+      <textarea data-save="s2_q2"></textarea>
+    </div>
+  </section>
+
+  <!-- STATION 3 -->
+  <section class="station" data-station="3">
+    <div class="station-head"><span class="station-num">03</span><h2>Meet the hash family</h2></div>
+    <p class="goal">Goal: compare four hashing algorithms on the same input.</p>
+    <div class="steps">
+      <ol>
+        <li>Set Input to: <code class="field">TappanZee!</code></li>
+        <li>One at a time, swap the Recipe operation between <code class="field">MD5</code>, <code class="field">SHA1</code>, <code class="field">SHA2</code> (size 256), and <code class="field">SHA2</code> (size 512) &mdash; drag the old one out first.</li>
+        <li>Fill in the table below for each.</li>
+      </ol>
+    </div>
+    <div class="overflow-x">
+      <table class="datatab">
+        <thead><tr><th>Algorithm</th><th>Output (first 12 characters is fine)</th><th>Length (# characters)</th></tr></thead>
+        <tbody>
+          <tr><td>MD5</td><td><input type="text" data-save="s3_md5"></td><td><input type="text" data-save="s3_md5len"></td></tr>
+          <tr><td>SHA1</td><td><input type="text" data-save="s3_sha1"></td><td><input type="text" data-save="s3_sha1len"></td></tr>
+          <tr><td>SHA256</td><td><input type="text" data-save="s3_sha256"></td><td><input type="text" data-save="s3_sha256len"></td></tr>
+          <tr><td>SHA512</td><td><input type="text" data-save="s3_sha512"></td><td><input type="text" data-save="s3_sha512len"></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="qbox">
+      <p class="q">Q5. MD5 and SHA1 are both considered "broken" for security purposes today, even though they still produce hashes here. Based on what you searched or already know, why might a shorter, older algorithm be considered weaker?</p>
+      <textarea data-save="s3_q1"></textarea>
+    </div>
+  </section>
+
+  <!-- STATION 4 -->
+  <section class="station" data-station="4">
+    <div class="station-head"><span class="station-num">04</span><h2>Salt in the recipe</h2></div>
+    <p class="goal">Goal: see why sites add random "salt" before hashing.</p>
+    <div class="steps">
+      <ol>
+        <li>Set Input to: <code class="field">password</code> and hash it with SHA256. Record the output.</li>
+        <li>Now change Input to: <code class="field">passwordXyZ9</code> (imagine "XyZ9" is a random salt the site generated just for this account) and hash it with SHA256 again. Record the output.</li>
+      </ol>
+    </div>
+    <div class="console">
+      <label>Output &mdash; SHA256 of "password"</label>
+      <input type="text" data-save="s4_hash1" placeholder="paste result">
+    </div>
+    <div class="console">
+      <label>Output &mdash; SHA256 of "passwordXyZ9"</label>
+      <input type="text" data-save="s4_hash2" placeholder="paste result">
+    </div>
+    <div class="callout">Real systems store the salt alongside the hash, and generate a new random salt for every single account &mdash; even two people who both pick "password" end up with completely different stored hashes.</div>
+    <div class="qbox">
+      <p class="q">Q6. Two students in this class both used "password" as their (bad) password. Without salting, what would their stored hashes look like? With salting, what changes?</p>
+      <textarea data-save="s4_q1"></textarea>
+    </div>
+    <div class="qbox">
+      <p class="q">Q7. Attackers sometimes use pre-built lists of common passwords already matched to their hashes, called <em>rainbow tables</em>, to look up a stolen hash instantly. Why does salting make a rainbow table useless against these accounts?</p>
+      <textarea data-save="s4_q2"></textarea>
+    </div>
+  </section>
+
+  <!-- STATION 5 -->
+  <section class="station" data-station="5">
+    <div class="station-head"><span class="station-num">05</span><h2>Why length still wins</h2></div>
+    <p class="goal">Goal: connect hashing to real password strength, without any hashing left to do.</p>
+    <p style="font-size:14.5px;">Hashing protects a password once it's stored &mdash; but a weak password is still weak. If attackers get a stolen hash, they can't reverse it, but they can guess millions of candidate passwords per second, hash each guess, and check for a match. This is called a <em>brute-force</em> or <em>dictionary</em> attack. Roughly, here's how the search space grows:</p>
+    <div class="overflow-x">
+      <table class="datatab">
+        <thead><tr><th>Password style</th><th>Example</th><th>Rough guesses needed to exhaust all options</th></tr></thead>
+        <tbody>
+          <tr><td>4 lowercase letters</td><td>abcd</td><td>~ 456,000</td></tr>
+          <tr><td>8 lowercase letters</td><td>abcdefgh</td><td>~ 209 billion</td></tr>
+          <tr><td>8 mixed case + digits</td><td>aB3xQ9zK</td><td>~ 218 trillion</td></tr>
+          <tr><td>12 mixed case + digits + symbols</td><td>Tz9!kR2#vQmP</td><td>~ 4.7 x 10^23</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="qbox">
+      <p class="q">Q8. A common password ("password123", "qwerty", a name + birth year) can often be checked in seconds even after hashing, no matter how strong the algorithm is. Why doesn't a strong hash algorithm save a weak password?</p>
+      <textarea data-save="s5_q1"></textarea>
+    </div>
+    <div class="qbox">
+      <p class="q">Exit ticket: In one or two sentences, explain to a friend who has never taken this class: what is a hash, and why does it keep their password safer than storing it as plain text?</p>
+      <textarea data-save="s5_exit" style="min-height:80px;"></textarea>
+    </div>
+  </section>
+
+  <section class="brief" id="exportSection">
+    <h2>Submit your answers</h2>
+    <p style="margin-bottom:12px;">When you're done, click below \u2014 it copies everything you entered and opens the submission form in a new tab. Just paste into the paragraph box there.</p>
+    <button id="copyBtn" type="button" style="font-family:'IBM Plex Mono', monospace; font-size:13.5px; background:var(--steel); color:var(--paper); border:none; border-radius:var(--radius); padding:10px 16px; cursor:pointer;">Copy my answers &amp; open form</button>
+    <span id="copyStatus" style="margin-left:10px; font-family:'IBM Plex Mono', monospace; font-size:12.5px; color:var(--ok);"></span>
+    <textarea id="exportBox" readonly style="width:100%; min-height:90px; margin-top:12px; font-family:'IBM Plex Mono', monospace; font-size:12px; padding:9px 11px; border:1px solid var(--rule); border-radius:var(--radius); background:var(--paper-2); color:var(--ink); display:none;"></textarea>
+    <p style="font-size:12.5px; color:var(--ink-soft); margin-top:8px; margin-bottom:0;">If the copy button doesn't work on your device, the text box above will appear so you can select and copy it by hand.</p>
+  </section>
+
+  <footer class="foot">
+    <span>Cybersecurity &middot; Hash Investigation Lab</span>
+    <span class="savepill" id="saveStatus">answers save automatically on this device</span>
+  </footer>
+</div>
+
+<script>
+(function(){
+  var KEY_PREFIX = 'hashlab_';
+  var fields = document.querySelectorAll('[data-save]');
+  var nameField = document.getElementById('fname');
+  var periodField = document.getElementById('fperiod');
+
+  function safeGet(k){
+    try { return localStorage.getItem(KEY_PREFIX + k); } catch(e){ return null; }
+  }
+  function safeSet(k, v){
+    try { localStorage.setItem(KEY_PREFIX + k, v); } catch(e){ /* storage unavailable, ignore */ }
+  }
+
+  // restore
+  [].forEach.call(fields, function(el){
+    var v = safeGet(el.getAttribute('data-save'));
+    if (v !== null) el.value = v;
+  });
+  var n = safeGet('_name'); if (n !== null) nameField.value = n;
+  var p = safeGet('_period'); if (p !== null) periodField.value = p;
+
+  // persist on input
+  [].forEach.call(fields, function(el){
+    el.addEventListener('input', function(){
+      safeSet(el.getAttribute('data-save'), el.value);
+      updateProgress();
+    });
+  });
+  nameField.addEventListener('input', function(){ safeSet('_name', nameField.value); });
+  periodField.addEventListener('input', function(){ safeSet('_period', periodField.value); });
+
+  // progress rail: one segment per station, marked done when its first console/table field is filled
+  var stations = document.querySelectorAll('.station');
+  var rail = document.getElementById('rail');
+  stations.forEach(function(){
+    var seg = document.createElement('div');
+    seg.className = 'seg';
+    rail.appendChild(seg);
+  });
+  function updateProgress(){
+    var segs = rail.querySelectorAll('.seg');
+    stations.forEach(function(st, i){
+      var inputs = st.querySelectorAll('input[data-save], textarea[data-save]');
+      var filled = 0;
+      inputs.forEach(function(inp){ if (inp.value.trim().length > 0) filled++; });
+      var ratio = inputs.length ? filled / inputs.length : 0;
+      segs[i].classList.toggle('done', ratio >= 0.5);
+    });
+  }
+  updateProgress();
+
+  // ---- Copy-my-answers export ----
+  var LABELS = [
+    ['s1_hash', 'Station 1 \u2013 MD5 hash of "password123"'],
+    ['s1_q1', 'Station 1 \u2013 Q1 (characters recognizable?)'],
+    ['s1_q2', 'Station 1 \u2013 Q2 (why is hashing one-way?)'],
+    ['s2_hash', 'Station 2 \u2013 MD5 hash of "Password123"'],
+    ['s2_q1', 'Station 2 \u2013 Q3 (how much of the hash matches?)'],
+    ['s2_q2', 'Station 2 \u2013 Q4 (why avalanche effect matters)'],
+    ['s3_md5', 'Station 3 \u2013 MD5 output'],
+    ['s3_md5len', 'Station 3 \u2013 MD5 length'],
+    ['s3_sha1', 'Station 3 \u2013 SHA1 output'],
+    ['s3_sha1len', 'Station 3 \u2013 SHA1 length'],
+    ['s3_sha256', 'Station 3 \u2013 SHA256 output'],
+    ['s3_sha256len', 'Station 3 \u2013 SHA256 length'],
+    ['s3_sha512', 'Station 3 \u2013 SHA512 output'],
+    ['s3_sha512len', 'Station 3 \u2013 SHA512 length'],
+    ['s3_q1', 'Station 3 \u2013 Q5 (why are MD5/SHA1 weaker?)'],
+    ['s4_hash1', 'Station 4 \u2013 SHA256 of "password"'],
+    ['s4_hash2', 'Station 4 \u2013 SHA256 of "passwordXyZ9"'],
+    ['s4_q1', 'Station 4 \u2013 Q6 (unsalted vs salted hashes)'],
+    ['s4_q2', 'Station 4 \u2013 Q7 (why salting defeats rainbow tables)'],
+    ['s5_q1', 'Station 5 \u2013 Q8 (why strong hash can\u2019t save a weak password)'],
+    ['s5_exit', 'Exit ticket']
+  ];
+
+  function buildExportText(){
+    var lines = [];
+    lines.push('Name: ' + (nameField.value || '(not entered)'));
+    lines.push('Period/Class: ' + (periodField.value || '(not entered)'));
+    lines.push('');
+    LABELS.forEach(function(pair){
+      var el = document.querySelector('[data-save="' + pair[0] + '"]');
+      var val = el ? el.value.trim() : '';
+      lines.push(pair[1] + ': ' + (val || '(blank)'));
+    });
+    return lines.join('\n');
+  }
+
+  var copyBtn = document.getElementById('copyBtn');
+  var copyStatus = document.getElementById('copyStatus');
+  var exportBox = document.getElementById('exportBox');
+  var FORM_URL = 'https://forms.gle/Tx3upJVmXWPnvbHW8';
+
+  copyBtn.addEventListener('click', function(){
+    var text = buildExportText();
+    exportBox.value = text;
+    var copied = false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text);
+        copied = true;
+      }
+    } catch(e) { copied = false; }
+
+    if (!copied) {
+      // fallback: legacy copy command
+      try {
+        exportBox.style.display = 'block';
+        exportBox.focus();
+        exportBox.select();
+        document.execCommand('copy');
+        copied = true;
+      } catch(e) { copied = false; }
+    }
+
+    exportBox.style.display = 'block';
+    copyStatus.textContent = copied ? 'Copied! Opening the submission form\u2026 paste your answers into the paragraph box.' : 'Select the text below and copy it manually, then open the form.';
+    window.open(FORM_URL, '_blank', 'noopener');
+  });
+})();
+</script>
+</body>
+</html>
